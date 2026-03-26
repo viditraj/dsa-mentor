@@ -193,3 +193,31 @@ export const getFAANGMilestones = (userId) =>
 
 export const getFAANGMotivation = (context = 'progress') =>
   request(`/faang-prep/motivation?context=${context}`);
+
+// ── System Design ──
+export const getSystemDesignOverview = () => request('/system-design/overview');
+
+export const getSystemDesignConcepts = (phase = null, tag = null) => {
+  const params = new URLSearchParams();
+  if (phase) params.set('phase', phase);
+  if (tag) params.set('tag', tag);
+  const qs = params.toString();
+  return request(`/system-design/concepts${qs ? `?${qs}` : ''}`);
+};
+
+export const getSystemDesignConcept = (conceptId) =>
+  request(`/system-design/concept/${conceptId}`);
+
+// ── AI/ML Concepts ──
+export const getAIConceptsOverview = () => request('/ai-concepts/overview');
+
+export const getAIConcepts = (phase = null, tag = null) => {
+  const params = new URLSearchParams();
+  if (phase) params.set('phase', phase);
+  if (tag) params.set('tag', tag);
+  const qs = params.toString();
+  return request(`/ai-concepts/concepts${qs ? `?${qs}` : ''}`);
+};
+
+export const getAIConcept = (conceptId) =>
+  request(`/ai-concepts/concept/${conceptId}`);

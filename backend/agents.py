@@ -2,9 +2,150 @@
 import asyncio
 import json
 import os
+import re
 from typing import Optional
 
 from llm_client import get_llm_client
+
+
+def _repair_and_parse_json(raw: str) -> dict:
+    """Attempt to parse JSON from LLM output, repairing common issues.
+
+    LLMs frequently produce JSON with:
+      - Markdown code fences around the JSON
+      - Unescaped newlines/tabs inside string values
+      - Triple-quoted strings (Python-style '''/\"\"\") instead of JSON strings
+      - Trailing commas before } or ]
+      - Control characters
+
+    Returns the parsed dict or raises on failure.
+    """
+    text = raw.strip()
+
+    # Strip markdown code fences
+    fence_match = re.match(r'^```(?:json)?\s*\n?(.*?)\n?\s*```$', text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+
+    # First try: direct parse (fast path)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Replace triple-quoted strings (Python-style) with proper JSON strings.
+    # LLMs sometimes output '''...''' or \"\"\"...\"\"\" for multi-line values.
+    def _replace_triple_quotes(t):
+        for delim in ("'''", '"""'):
+            while delim in t:
+                start = t.find(delim)
+                end = t.find(delim, start + 3)
+                if end == -1:
+                    break
+                inner = t[start + 3:end]
+                # Escape the inner content for JSON
+                escaped = inner.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                t = t[:start] + '"' + escaped + '"' + t[end + 3:]
+        return t
+
+    text = _replace_triple_quotes(text)
+
+    # Try again after triple-quote fix
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Fix unescaped control chars inside JSON string values.
+    # Walk the string tracking whether we're inside a JSON string literal,
+    # and escape any raw newlines/tabs/control chars found inside strings.
+    repaired_chars = []
+    in_string = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if in_string:
+            if ch == '\\':
+                # Emit the backslash and the next char as-is (it's an escape sequence)
+                repaired_chars.append(ch)
+                if i + 1 < len(text):
+                    i += 1
+                    repaired_chars.append(text[i])
+                i += 1
+                continue
+            if ch == '"':
+                in_string = False
+                repaired_chars.append(ch)
+                i += 1
+                continue
+            # Escape raw control characters that break JSON
+            if ch == '\n':
+                repaired_chars.append('\\n')
+                i += 1
+                continue
+            if ch == '\r':
+                repaired_chars.append('\\r')
+                i += 1
+                continue
+            if ch == '\t':
+                repaired_chars.append('\\t')
+                i += 1
+                continue
+            if ord(ch) < 0x20:
+                repaired_chars.append(f'\\u{ord(ch):04x}')
+                i += 1
+                continue
+            repaired_chars.append(ch)
+        else:
+            if ch == '"':
+                in_string = True
+            repaired_chars.append(ch)
+        i += 1
+
+    repaired = ''.join(repaired_chars)
+
+    # Remove trailing commas before } or ]
+    repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    # Last try: extract the largest JSON object from the text
+    json_blocks = []
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for idx, c in enumerate(repaired):
+        if esc:
+            esc = False
+            continue
+        if c == '\\' and in_str:
+            esc = True
+            continue
+        if c == '"' and not esc:
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == '{':
+            if depth == 0:
+                start = idx
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0 and start >= 0:
+                json_blocks.append(repaired[start:idx + 1])
+                start = -1
+
+    if json_blocks:
+        candidate = max(json_blocks, key=len)
+        return json.loads(candidate)
+
+    # Give up — raise with original error
+    return json.loads(text)
 
 
 async def _call_llm(system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
@@ -100,7 +241,7 @@ Return a JSON with:
 
     try:
         result = await _call_llm(ROADMAP_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "total_days": 90,
@@ -203,7 +344,7 @@ Return as JSON:
     try:
         result = await _call_llm(TEACHING_SYSTEM_PROMPT, prompt, json_mode=True)
         print(f"[teach_concept] LLM returned {len(result)} chars, starts with: {result[:200]}")
-        parsed = json.loads(result)
+        parsed = _repair_and_parse_json(result)
         # Validate that we got the expected structure
         if "explanation" not in parsed or len(parsed.get("explanation", "")) < 50:
             print(f"[teach_concept] LLM response missing 'explanation' field or too short, keys: {list(parsed.keys())}")
@@ -302,7 +443,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(ASSESSMENT_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "score": 5,
@@ -340,7 +481,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(TEACHING_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         hints = {
             1: "Think about what data structure would allow O(1) lookups.",
@@ -409,7 +550,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(BRIDGE_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "title": f"Bridge: {from_topic} → {to_topic}",
@@ -455,7 +596,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(REVIEW_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "question": f"Explain the key concept behind {card_title} and when you'd use it.",
@@ -563,7 +704,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(TEACHING_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "greeting": f"Welcome to Day {day_number}! Let's learn something amazing today.",
@@ -643,7 +784,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(PATTERN_ANALYSIS_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "detected_pattern": "unknown",
@@ -723,7 +864,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(AI_SOLVE_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "problem_understanding": f"**{problem_title}** is a {difficulty} level problem. Enable AI features (Dell SSO) for a comprehensive walkthrough.",
@@ -786,7 +927,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(TEST_CASE_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "function_name": "solution",
@@ -871,7 +1012,7 @@ Return as JSON:
 
     try:
         result = await _call_llm(PATTERN_STORY_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        return _repair_and_parse_json(result)
     except Exception:
         return {
             "title": f"Mastering {pattern_info['name']}",
@@ -900,13 +1041,15 @@ Why it's asked: {question['why']}
 Companies: {', '.join(question['companies'])}
 
 Create an interview-focused walkthrough. Imagine you're coaching someone who has 30 minutes
-to solve this in an actual FAANG interview.
+to solve this in an actual FAANG interview. Start by clearly explaining the problem so the
+reader understands what they need to solve before diving into approaches.
 
 Return as JSON:
 {{
     "problem_title": "{question['title']}",
     "difficulty": "{question['difficulty']}",
     "pattern_used": "{question['pattern']}",
+    "problem_explanation": "Clear explanation of the problem statement in markdown. Include: what the input is, what the output should be, the constraints, and 1-2 concrete examples with input/output. Make sure the reader fully understands the problem before moving on.",
     "interviewer_expects": "What the interviewer is really testing with this problem",
     "brute_force": "Brief brute force approach and why it's not good enough",
     "optimal_approach": "Step-by-step optimal approach in plain English",
@@ -918,15 +1061,42 @@ Return as JSON:
     "interview_tips": ["How to communicate your thinking", "Edge cases to mention"]
 }}"""
 
+    result = None
     try:
         result = await _call_llm(AI_SOLVE_SYSTEM_PROMPT, prompt, json_mode=True)
-        return json.loads(result)
+        parsed = _repair_and_parse_json(result)
+        # Normalize fields: LLMs sometimes return nested objects where strings
+        # are expected. Convert dicts to readable markdown strings.
+        for key in ("problem_explanation", "brute_force", "optimal_approach",
+                     "key_insight", "dry_run", "interviewer_expects"):
+            val = parsed.get(key)
+            if isinstance(val, dict):
+                parts = []
+                for k, v in val.items():
+                    label = k.replace("_", " ").title()
+                    if isinstance(v, dict):
+                        v = ", ".join(f"**{sk}**: {sv}" for sk, sv in v.items())
+                    parts.append(f"**{label}:** {v}")
+                parsed[key] = "\n\n".join(parts)
+            elif isinstance(val, list):
+                parsed[key] = "\n".join(f"- {item}" for item in val)
+        # Normalize solution_code: may arrive as {language, code} dict
+        sc = parsed.get("solution_code")
+        if isinstance(sc, dict):
+            code = sc.get("code", sc.get("solution", ""))
+            lang = sc.get("language", language)
+            parsed["solution_code"] = f"```{lang}\n{code.strip()}\n```" if code else ""
+        parsed["ai_generated"] = True
+        return parsed
     except Exception as e:
         print(f"[FAANG Walkthrough] Failed to parse LLM response: {e}")
         return {
+            "ai_generated": False,
+            "ai_error": str(e),
             "problem_title": question["title"],
             "difficulty": question["difficulty"],
             "pattern_used": question["pattern"],
+            "problem_explanation": f"**{question['title']}** (LeetCode #{question['leetcode']})\n\nEnable AI for a detailed problem explanation with examples.",
             "interviewer_expects": f"Understanding of the {question['pattern']} pattern and clean implementation.",
             "brute_force": "The brute force approach is usually O(n^2). Enable AI for detailed analysis.",
             "optimal_approach": f"Use the {question['pattern']} pattern for an optimal solution.",

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db
-from routes import users, roadmap, problems, daily_plan, chat, stats, skill_tree, review, videos, patterns, faang_prep, settings
+from routes import users, roadmap, problems, daily_plan, chat, stats, skill_tree, review, videos, patterns, faang_prep, settings, system_design, ai_concepts
 
 
 @asynccontextmanager
@@ -46,6 +46,8 @@ app.include_router(videos.router, prefix="/api", tags=["Videos"])
 app.include_router(patterns.router, prefix="/api", tags=["Patterns"])
 app.include_router(faang_prep.router, prefix="/api", tags=["FAANG Prep"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(system_design.router, prefix="/api", tags=["System Design"])
+app.include_router(ai_concepts.router, prefix="/api", tags=["AI Concepts"])
 
 # Serve frontend static files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")

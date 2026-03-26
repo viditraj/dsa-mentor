@@ -8,7 +8,7 @@ import {
   Flame, Trophy, Target, ChevronDown, ChevronRight, BookOpen, Code2,
   CheckCircle2, Circle, Clock, Building2, Star, Zap, ArrowRight,
   Lock, Unlock, Brain, Sparkles, ExternalLink, Play, ChevronLeft,
-  Award, TrendingUp, BarChart3, Lightbulb, X
+  Award, TrendingUp, BarChart3, Lightbulb, X, AlertTriangle, RefreshCw
 } from 'lucide-react'
 import {
   getFAANGOverview, getFAANGProgress, getFAANGPatternDetail,
@@ -302,6 +302,21 @@ export default function FAANGPrepPage({ userId, user }) {
           </div>
         ) : walkthroughData ? (
           <div className="space-y-6">
+            {walkthroughData.ai_generated === false && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium">AI walkthrough unavailable</p>
+                  <p className="text-sm text-amber-400/70">The LLM did not respond. Showing placeholder content.</p>
+                </div>
+                <button
+                  onClick={() => loadWalkthrough(activeQuestion)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-sm font-medium transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Retry
+                </button>
+              </div>
+            )}
             <div className="glass-card p-6 rounded-xl border border-indigo-500/30">
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold">{walkthroughData.problem_title}</h1>
@@ -314,6 +329,14 @@ export default function FAANGPrepPage({ userId, user }) {
               </div>
               <p className="text-gray-400 text-sm">{activeQuestion.why}</p>
             </div>
+
+            {/* Problem explanation */}
+            {walkthroughData.problem_explanation && (
+              <div className="glass-card p-6 rounded-xl border border-blue-500/20">
+                <h2 className="text-lg font-bold mb-3 flex items-center gap-2"><BookOpen className="w-5 h-5 text-blue-400" /> Problem Statement</h2>
+                <Md>{walkthroughData.problem_explanation}</Md>
+              </div>
+            )}
 
             {/* What interviewer expects */}
             <div className="glass-card p-6 rounded-xl border border-amber-500/20">

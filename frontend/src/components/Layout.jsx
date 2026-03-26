@@ -1,12 +1,15 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Map, CalendarDays, Code2, MessageCircle,
-  GraduationCap, LogOut, Zap, Trophy, GitBranch, Brain, Flame
+  GraduationCap, LogOut, Zap, Trophy, GitBranch, Brain, Flame,
+  Server, Cpu
 } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/faang-prep', label: 'FAANG 75', icon: Flame },
+  { path: '/system-design', label: 'System Design', icon: Server },
+  { path: '/ai-concepts', label: 'AI/ML Concepts', icon: Cpu },
   { path: '/roadmap', label: 'Roadmap', icon: Map },
   { path: '/daily', label: 'Daily Plan', icon: CalendarDays },
   { path: '/learn', label: 'Learn', icon: GraduationCap },

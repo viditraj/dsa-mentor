@@ -11,6 +11,8 @@ import LearnPage from './pages/LearnPage'
 import SkillTreePage from './pages/SkillTreePage'
 import ReviewQueuePage from './pages/ReviewQueuePage'
 import FAANGPrepPage from './pages/FAANGPrepPage'
+import SystemDesignPage from './pages/SystemDesignPage'
+import AIConceptsPage from './pages/AIConceptsPage'
 
 function App() {
   const [user, setUser] = useUser()
@@ -30,6 +32,8 @@ function App() {
         <Route path="/skill-tree" element={<SkillTreePage userId={user.id} />} />
         <Route path="/review" element={<ReviewQueuePage userId={user.id} />} />
         <Route path="/faang-prep" element={<FAANGPrepPage userId={user.id} user={user} />} />
+        <Route path="/system-design" element={<SystemDesignPage userId={user.id} user={user} />} />
+        <Route path="/ai-concepts" element={<AIConceptsPage userId={user.id} user={user} />} />
         <Route path="/chat" element={<ChatPage userId={user.id} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

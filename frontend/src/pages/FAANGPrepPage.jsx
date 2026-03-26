@@ -15,6 +15,8 @@ import {
   getFAANGPatternStory, submitFAANGQuestion, markFAANGStoryRead,
   markFAANGTemplatePracticed, getFAANGQuestionWalkthrough,
 } from '../api/client'
+import TeachingModeWidget from '../components/TeachingModeWidget'
+import CodeExecutor from '../components/CodeExecutor'
 
 /* ─── Difficulty badge ─── */
 const DiffBadge = ({ d }) => {
@@ -277,6 +279,9 @@ export default function FAANGPrepPage({ userId, user }) {
                 <p className="text-indigo-300 italic">{storyData.motivation}</p>
               </div>
             )}
+
+            {/* Teaching modes for this pattern */}
+            <TeachingModeWidget topic={storyData.title || pattern?.name} compact />
           </div>
         ) : null}
       </div>
@@ -380,6 +385,11 @@ export default function FAANGPrepPage({ userId, user }) {
               </div>
             </div>
 
+            {/* Run the solution code */}
+            {walkthroughData.solution_code && (
+              <CodeExecutor code={walkthroughData.solution_code} language="python" compact />
+            )}
+
             {/* Interview tips */}
             {walkthroughData.interview_tips?.length > 0 && (
               <div className="glass-card p-6 rounded-xl border border-amber-500/20">
@@ -407,6 +417,9 @@ export default function FAANGPrepPage({ userId, user }) {
                 </ul>
               </div>
             )}
+
+            {/* Teaching modes for deeper understanding */}
+            <TeachingModeWidget topic={walkthroughData.problem_title || activeQuestion?.title} compact />
 
             {/* Mark solved button */}
             {!progress?.solved_ids?.includes(activeQuestion.id) && (

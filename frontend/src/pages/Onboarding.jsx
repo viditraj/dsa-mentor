@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Zap, ArrowRight, Target, Clock, Code2, Building2 } from 'lucide-react'
-import { createUser, generateRoadmap } from '../api/client'
+import { Zap, ArrowRight, Target, Clock, Code2, Building2, LogIn } from 'lucide-react'
+import { createUser, getUserByEmail, generateRoadmap } from '../api/client'
 
 const EXPERIENCE_LEVELS = [
   { value: 'beginner', label: 'Beginner', desc: 'New to DSA, know basic programming', color: 'from-green-500 to-emerald-600' },
@@ -18,7 +18,9 @@ const LANGUAGES = [
 
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0)
+  const [mode, setMode] = useState('signup') // 'signup' or 'login'
   const [loading, setLoading] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -28,6 +30,19 @@ export default function Onboarding({ onComplete }) {
     target_company: '',
   })
 
+  const handleLogin = async () => {
+    if (!loginEmail.trim()) return
+    setLoading(true)
+    try {
+      const user = await getUserByEmail(loginEmail.trim())
+      onComplete(user)
+    } catch (err) {
+      alert('No account found with that email. Please sign up first.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     try {
@@ -36,6 +51,14 @@ export default function Onboarding({ onComplete }) {
       await generateRoadmap(user.id)
       onComplete(user)
     } catch (err) {
+      // If email already registered, try to log them in automatically
+      if (err.message?.toLowerCase().includes('already registered')) {
+        try {
+          const user = await getUserByEmail(formData.email)
+          onComplete(user)
+          return
+        } catch {}
+      }
       alert(err.message || 'Failed to create profile')
     } finally {
       setLoading(false)
@@ -55,12 +78,52 @@ export default function Onboarding({ onComplete }) {
         Your AI-powered personal coach for mastering Data Structures & Algorithms.
         Get a personalized roadmap, daily lessons, and crack any tech interview.
       </p>
-      <button
-        onClick={() => setStep(1)}
-        className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 rounded-xl text-white font-semibold transition-all duration-200 shadow-lg shadow-indigo-500/25"
-      >
-        Get Started <ArrowRight className="w-5 h-5" />
-      </button>
+
+      {mode === 'signup' ? (
+        <>
+          <button
+            onClick={() => setStep(1)}
+            className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 rounded-xl text-white font-semibold transition-all duration-200 shadow-lg shadow-indigo-500/25"
+          >
+            Get Started <ArrowRight className="w-5 h-5" />
+          </button>
+          <p className="mt-4 text-sm text-gray-500">
+            Already have an account?{' '}
+            <button onClick={() => setMode('login')} className="text-indigo-400 hover:text-indigo-300 font-medium">
+              Sign In
+            </button>
+          </p>
+        </>
+      ) : (
+        <div className="max-w-sm mx-auto text-left">
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+          <input
+            type="email"
+            value={loginEmail}
+            onChange={e => setLoginEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            placeholder="your@email.com"
+            className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-white placeholder-gray-500"
+          />
+          <button
+            onClick={handleLogin}
+            disabled={loading || !loginEmail.trim()}
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 rounded-xl text-white font-semibold transition-all duration-200 shadow-lg shadow-indigo-500/25 disabled:opacity-50"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <><LogIn className="w-5 h-5" /> Sign In</>
+            )}
+          </button>
+          <p className="mt-4 text-sm text-gray-500 text-center">
+            Don't have an account?{' '}
+            <button onClick={() => setMode('signup')} className="text-indigo-400 hover:text-indigo-300 font-medium">
+              Sign Up
+            </button>
+          </p>
+        </div>
+      )}
     </div>,
 
     // Step 1: Name & Email

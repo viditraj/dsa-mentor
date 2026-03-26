@@ -7,7 +7,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db
-from routes import users, roadmap, problems, daily_plan, chat, stats, skill_tree, review, videos, patterns, faang_prep, settings, system_design, ai_concepts
+from routes import (
+    users, roadmap, problems, daily_plan, chat, stats, skill_tree,
+    review, videos, patterns, faang_prep, settings, system_design, ai_concepts,
+    code_execution, mock_interview, weakness_drill, complexity_analyzer,
+    interview_toolkit, problem_similarity, behavioral_prep, teaching_modes,
+    trending_topics,
+)
 
 
 @asynccontextmanager
@@ -48,6 +54,15 @@ app.include_router(faang_prep.router, prefix="/api", tags=["FAANG Prep"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(system_design.router, prefix="/api", tags=["System Design"])
 app.include_router(ai_concepts.router, prefix="/api", tags=["AI Concepts"])
+app.include_router(code_execution.router, prefix="/api/code", tags=["Code Execution"])
+app.include_router(mock_interview.router, prefix="/api/mock-interview", tags=["Mock Interview"])
+app.include_router(weakness_drill.router, prefix="/api/weakness-drill", tags=["Weakness Drill"])
+app.include_router(complexity_analyzer.router, prefix="/api/complexity", tags=["Complexity Analyzer"])
+app.include_router(interview_toolkit.router, prefix="/api/interview-toolkit", tags=["Interview Toolkit"])
+app.include_router(problem_similarity.router, prefix="/api/similarity", tags=["Problem Similarity"])
+app.include_router(behavioral_prep.router, prefix="/api/behavioral", tags=["Behavioral Prep"])
+app.include_router(teaching_modes.router, prefix="/api/teaching", tags=["Teaching Modes"])
+app.include_router(trending_topics.router, prefix="/api/trending", tags=["Trending Topics"])
 
 # Serve frontend static files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")

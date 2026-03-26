@@ -12,6 +12,8 @@ import remarkGfm from 'remark-gfm'
 import * as api from '../api/client'
 import { PatternBadge, PatternInfoPanel, PatternAnalysisResult } from '../components/PatternCard'
 import CodeRunner from '../components/CodeRunner'
+import CodeExecutor from '../components/CodeExecutor'
+import TeachingModeWidget from '../components/TeachingModeWidget'
 
 const STATUS_CONFIG = {
   not_started: { icon: Clock, label: 'Not Started', color: 'text-gray-400', bg: 'bg-gray-500/10' },
@@ -756,6 +758,9 @@ export default function PracticePage({ userId, user }) {
                 difficulty={selectedProblem.difficulty}
               />
             )}
+
+            {/* Backend Code Executor (all languages) */}
+            <CodeExecutor code={code} language={language} compact />
           </div>
 
           {/* Right: Feedback + Pattern Analysis + Hints */}
@@ -840,6 +845,9 @@ export default function PracticePage({ userId, user }) {
               problemDescription={selectedProblem.description}
               userCode={code}
             />
+
+            {/* Teaching Modes (ELI5 / Socratic) */}
+            <TeachingModeWidget topic={selectedProblem.title} compact />
 
             {/* No feedback yet placeholder */}
             {!feedback && !showHints && !patternAnalysis && !showAiSolution && (

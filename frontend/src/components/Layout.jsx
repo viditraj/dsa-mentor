@@ -2,11 +2,12 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Map, CalendarDays, Code2, MessageCircle,
   GraduationCap, LogOut, Zap, Trophy, GitBranch, Brain, Flame,
-  Server, Cpu
+  Server, Cpu, Mic, Target, Briefcase, Users, TrendingUp
 } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/trending', label: 'Trending Topics', icon: TrendingUp },
   { path: '/faang-prep', label: 'FAANG 75', icon: Flame },
   { path: '/system-design', label: 'System Design', icon: Server },
   { path: '/ai-concepts', label: 'AI/ML Concepts', icon: Cpu },
@@ -14,6 +15,10 @@ const navItems = [
   { path: '/daily', label: 'Daily Plan', icon: CalendarDays },
   { path: '/learn', label: 'Learn', icon: GraduationCap },
   { path: '/practice', label: 'Practice', icon: Code2 },
+  { path: '/mock-interview', label: 'Mock Interview', icon: Mic },
+  { path: '/weakness-drill', label: 'Weakness Drill', icon: Target },
+  { path: '/interview-toolkit', label: 'Interview Toolkit', icon: Briefcase },
+  { path: '/behavioral-prep', label: 'Behavioral Prep', icon: Users },
   { path: '/skill-tree', label: 'Skill Tree', icon: GitBranch },
   { path: '/review', label: 'Review', icon: Brain },
   { path: '/chat', label: 'AI Mentor', icon: MessageCircle },

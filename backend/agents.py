@@ -1106,3 +1106,910 @@ Return as JSON:
             "follow_up_questions": ["Can you optimize the space complexity?", "What if the input is very large?"],
             "interview_tips": ["Talk through your approach before coding", "Mention edge cases"],
         }
+
+
+# ═══════════════════════════════════════
+# MOCK INTERVIEW AGENTS
+# ═══════════════════════════════════════
+
+MOCK_INTERVIEW_START_PROMPT = """You are a senior software engineer conducting a technical coding interview.
+Your style should match real FAANG interviews: professional, probing, and encouraging.
+
+Generate an interview problem and opening message. The candidate is {experience_level} level.
+Difficulty: {difficulty}. Focus area: {focus_area}. Company style: {company_style}.
+Language: {language}. Duration: {duration_minutes} minutes.
+Candidate's weak areas: {weak_areas}
+
+Return JSON:
+{{
+    "problem_title": "descriptive title",
+    "problem_description": "full problem statement with examples and constraints",
+    "opening_message": "your greeting + how you'd present the problem (conversational, like a real interviewer)",
+    "hints_available": 3,
+    "expected_patterns": ["pattern1", "pattern2"],
+    "optimal_complexity": "O(n)",
+    "key_insight": "the main idea needed to solve this"
+}}"""
+
+
+async def start_mock_interview(experience_level, difficulty, focus_area, weak_areas,
+                                company_style, language, duration_minutes):
+    prompt = MOCK_INTERVIEW_START_PROMPT.format(
+        experience_level=experience_level,
+        difficulty=difficulty,
+        focus_area=focus_area or "general DSA",
+        weak_areas=weak_areas or [],
+        company_style=company_style or "generic FAANG",
+        language=language,
+        duration_minutes=duration_minutes,
+    )
+    try:
+        result = await _call_llm(
+            "You are a technical interviewer at a top tech company.",
+            prompt, json_mode=True,
+        )
+        return _repair_and_parse_json(result)
+    except Exception as e:
+        return {
+            "problem_title": "Two Sum Variant",
+            "problem_description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. You may assume each input has exactly one solution.",
+            "opening_message": f"Hi! Welcome to your mock interview. Today we'll work on a {difficulty} problem. Take your time to think through it, and feel free to ask clarifying questions.",
+            "hints_available": 3,
+            "expected_patterns": ["hash_map"],
+        }
+
+
+INTERVIEW_RESPOND_PROMPT = """You are a technical interviewer in an ongoing coding interview.
+
+Problem: {problem_title}
+Description: {problem_description}
+
+Conversation so far:
+{conversation_text}
+
+{code_section}
+
+Respond as the interviewer would. Be encouraging but probe deeper. If the candidate is stuck, give a gentle nudge (not the answer). If they present code, ask about edge cases or complexity.
+
+Return JSON:
+{{
+    "message": "your response as the interviewer",
+    "hint": null or "a subtle hint if they seem stuck",
+    "follow_up": "a follow-up question to ask next",
+    "assessment_so_far": "brief internal assessment of how they're doing",
+    "phase": "clarification|approach|coding|optimization|complete"
+}}"""
+
+
+async def interview_respond(conversation, problem_title, problem_description, candidate_code=None):
+    conv_text = "\n".join(
+        f"{'Interviewer' if m['role'] == 'interviewer' else 'Candidate'}: {m['content']}"
+        + (f"\n[Code submitted]\n```\n{m['code']}\n```" if m.get('code') else "")
+        for m in conversation
+    )
+    code_section = f"Latest code submitted:\n```\n{candidate_code}\n```" if candidate_code else ""
+
+    prompt = INTERVIEW_RESPOND_PROMPT.format(
+        problem_title=problem_title,
+        problem_description=problem_description,
+        conversation_text=conv_text,
+        code_section=code_section,
+    )
+    try:
+        result = await _call_llm(
+            "You are a senior technical interviewer.",
+            prompt, json_mode=True,
+        )
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "message": "That's an interesting approach. Can you walk me through your thinking?",
+            "hint": None,
+            "follow_up": "What's the time complexity of your solution?",
+            "assessment_so_far": "In progress",
+            "phase": "discussion",
+        }
+
+
+SCORE_INTERVIEW_PROMPT = """Score this mock coding interview.
+
+Problem: {problem_title} ({difficulty})
+Description: {problem_description}
+
+Full conversation:
+{conversation_text}
+
+Score each dimension 1-10 and provide detailed feedback.
+Return JSON:
+{{
+    "overall_score": 7,
+    "communication_score": 8,
+    "problem_solving_score": 7,
+    "code_quality_score": 6,
+    "time_management_score": 7,
+    "strengths": ["clear communication", "good edge case handling"],
+    "improvements": ["could optimize space complexity", "took too long on initial approach"],
+    "detailed_feedback": "markdown feedback with specific examples from the interview",
+    "hire_recommendation": "lean hire|hire|strong hire|lean no hire|no hire"
+}}"""
+
+
+async def score_mock_interview(conversation, problem_title, problem_description, difficulty):
+    conv_text = "\n".join(
+        f"{'Interviewer' if m['role'] == 'interviewer' else 'Candidate'}: {m['content']}"
+        + (f"\n```\n{m['code']}\n```" if m.get('code') else "")
+        for m in conversation
+    )
+    prompt = SCORE_INTERVIEW_PROMPT.format(
+        problem_title=problem_title,
+        problem_description=problem_description,
+        difficulty=difficulty,
+        conversation_text=conv_text,
+    )
+    try:
+        result = await _call_llm("You are a hiring committee reviewer.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "overall_score": 5,
+            "communication_score": 5,
+            "problem_solving_score": 5,
+            "code_quality_score": 5,
+            "time_management_score": 5,
+            "strengths": ["Completed the interview"],
+            "improvements": ["AI scoring unavailable - practice more and retry"],
+            "detailed_feedback": "Unable to generate detailed feedback. Try again.",
+            "hire_recommendation": "lean hire",
+        }
+
+
+# ═══════════════════════════════════════
+# WEAKNESS DRILL AGENT
+# ═══════════════════════════════════════
+
+WEAKNESS_DRILL_PROMPT = """You are a DSA coach creating a targeted drill session.
+
+Student profile:
+- Experience: {experience_level}
+- Weak areas: {weak_areas}
+- Strong areas: {strong_areas}
+- Focus pattern requested: {focus_pattern}
+- Difficulty preference: {difficulty}
+- Language: {language}
+
+Recent attempt history (last 50):
+{attempt_history}
+
+Generate {num_problems} practice problems that target the student's weaknesses.
+Each problem should build on the previous one, getting progressively harder.
+
+Return JSON:
+{{
+    "drill_title": "catchy name for this drill session",
+    "target_weakness": "the main weakness being targeted",
+    "why_these_problems": "explanation of why these problems were chosen",
+    "problems": [
+        {{
+            "title": "problem title",
+            "description": "full problem statement with examples",
+            "difficulty": "easy|medium|hard",
+            "target_pattern": "the pattern this drills",
+            "what_to_focus_on": "specific thing to practice",
+            "hints": ["hint1", "hint2"],
+            "solution_approach": "brief approach description",
+            "time_target_minutes": 15
+        }}
+    ],
+    "progression_explanation": "how problems build on each other",
+    "success_criteria": "what mastery looks like after completing this drill"
+}}"""
+
+
+async def generate_weakness_drill(experience_level, attempt_history, weak_areas, strong_areas,
+                                   focus_pattern, difficulty, num_problems, language):
+    prompt = WEAKNESS_DRILL_PROMPT.format(
+        experience_level=experience_level,
+        attempt_history=json.dumps(attempt_history[:30], default=str),
+        weak_areas=weak_areas,
+        strong_areas=strong_areas,
+        focus_pattern=focus_pattern or "auto-detect from weaknesses",
+        difficulty=difficulty or "progressive",
+        num_problems=num_problems,
+        language=language,
+    )
+    try:
+        result = await _call_llm("You are an expert DSA interview coach.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "drill_title": "General Practice Drill",
+            "target_weakness": focus_pattern or "mixed",
+            "problems": [],
+            "why_these_problems": "AI generation unavailable. Try again.",
+            "success_criteria": "Complete all problems without hints.",
+        }
+
+
+# ═══════════════════════════════════════
+# COMPLEXITY ANALYZER AGENT
+# ═══════════════════════════════════════
+
+COMPLEXITY_PROMPT = """Analyze the time and space complexity of this code in detail.
+
+```{language}
+{code}
+```
+
+{problem_context}
+{optimal_context}
+
+Provide a thorough line-by-line analysis. Identify loops, recursive calls, and data structures.
+
+Return JSON:
+{{
+    "time_complexity": "O(n log n)",
+    "space_complexity": "O(n)",
+    "analysis": {{
+        "summary": "one-line summary of the complexity",
+        "line_by_line": [
+            {{"lines": "3-7", "description": "outer loop iterates n times", "contribution": "O(n)"}},
+            {{"lines": "8-12", "description": "inner binary search", "contribution": "O(log n)"}}
+        ],
+        "dominant_term": "The nested loop with binary search gives O(n log n)",
+        "space_breakdown": "Hash map stores up to n elements: O(n)"
+    }},
+    "is_optimal": true,
+    "optimization_suggestions": [
+        {{
+            "current": "O(n^2)",
+            "achievable": "O(n)",
+            "how": "Use a hash map instead of nested loop",
+            "code_hint": "seen = set(); for x in arr: if target-x in seen: ..."
+        }}
+    ],
+    "recursion_analysis": null,
+    "comparison_with_optimal": "Your solution matches the optimal complexity."
+}}"""
+
+
+async def analyze_complexity(code, language="python", problem_title=None, known_optimal=None):
+    problem_context = f"Problem: {problem_title}" if problem_title else ""
+    optimal_context = f"Known optimal complexity: {known_optimal}" if known_optimal else ""
+
+    prompt = COMPLEXITY_PROMPT.format(
+        code=code,
+        language=language,
+        problem_context=problem_context,
+        optimal_context=optimal_context,
+    )
+    try:
+        result = await _call_llm("You are an algorithms complexity analysis expert.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "time_complexity": "Unable to analyze",
+            "space_complexity": "Unable to analyze",
+            "analysis": {"summary": "AI analysis unavailable. Try again."},
+            "is_optimal": None,
+            "optimization_suggestions": [],
+        }
+
+
+# ═══════════════════════════════════════
+# INTERVIEW DAY TOOLKIT AGENTS
+# ═══════════════════════════════════════
+
+PATTERN_QUIZ_PROMPT = """Generate a quick-fire pattern recognition quiz for interview warm-up.
+Student level: {experience_level}. Weak areas: {weak_areas}.
+
+Generate {num_questions} questions. Each shows a problem description and the student must identify the optimal DSA pattern.
+Time per question: {time_per_question} seconds.
+
+Return JSON:
+{{
+    "quiz_title": "Pattern Recognition Sprint",
+    "questions": [
+        {{
+            "index": 0,
+            "problem_snippet": "Given a sorted array, find two numbers that add up to target...",
+            "choices": ["two_pointers", "binary_search", "hash_map", "sliding_window"],
+            "correct_pattern": "two_pointers",
+            "explanation": "Since the array is sorted, two pointers from both ends is optimal.",
+            "difficulty": "easy"
+        }}
+    ],
+    "time_per_question": {time_per_question},
+    "tips": ["Look for keywords like 'sorted' or 'contiguous subarray'"]
+}}"""
+
+
+async def generate_pattern_quiz(experience_level, weak_areas, num_questions=10, time_per_question=30):
+    prompt = PATTERN_QUIZ_PROMPT.format(
+        experience_level=experience_level,
+        weak_areas=weak_areas,
+        num_questions=num_questions,
+        time_per_question=time_per_question,
+    )
+    try:
+        result = await _call_llm("You are a DSA quiz master.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {"quiz_title": "Pattern Quiz", "questions": [], "tips": ["AI unavailable"]}
+
+
+CHEAT_SHEET_PROMPT = """Generate a condensed 1-page cheat sheet for last-minute interview review.
+Student level: {experience_level}. Weak areas: {weak_areas}. Strong areas: {strong_areas}.
+Focus: {focus}
+
+Return JSON:
+{{
+    "title": "Your Interview Cheat Sheet",
+    "sections": [
+        {{
+            "topic": "Two Pointers",
+            "key_template": "left, right = 0, len(arr)-1; while left < right: ...",
+            "when_to_use": "sorted array, pair finding, palindromes",
+            "common_pitfalls": ["forgetting to handle duplicates"],
+            "time_complexity": "O(n)",
+            "one_liner": "Two ends walking toward each other"
+        }}
+    ],
+    "emergency_tips": ["If stuck, try brute force first then optimize", "Always state complexity"],
+    "time_management": "5 min understand, 10 min plan, 20 min code, 10 min test"
+}}"""
+
+
+async def generate_cheat_sheet(experience_level, weak_areas, strong_areas, focus=None):
+    prompt = CHEAT_SHEET_PROMPT.format(
+        experience_level=experience_level,
+        weak_areas=weak_areas,
+        strong_areas=strong_areas,
+        focus=focus or "all weak areas",
+    )
+    try:
+        result = await _call_llm("You are an interview prep expert.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {"title": "Cheat Sheet", "sections": [], "emergency_tips": ["AI unavailable"]}
+
+
+WARMUP_PROMPT = """Generate 2 easy warm-up coding problems for interview day.
+Student level: {experience_level}. Language: {language}.
+These should be confidence boosters - quick to solve (5-10 min each), covering fundamental patterns.
+
+Return JSON:
+{{
+    "title": "Interview Day Warm-Up",
+    "message": "Let's get warmed up! These quick problems will get you in the zone.",
+    "problems": [
+        {{
+            "title": "problem name",
+            "description": "full problem statement",
+            "difficulty": "easy",
+            "pattern": "hash_map",
+            "time_target_minutes": 5,
+            "solution": "complete solution code",
+            "walkthrough": "quick explanation"
+        }}
+    ],
+    "warm_up_tips": ["Take a deep breath", "Read the problem twice before coding"]
+}}"""
+
+
+async def generate_warmup_session(experience_level, language="python"):
+    prompt = WARMUP_PROMPT.format(experience_level=experience_level, language=language)
+    try:
+        result = await _call_llm("You are an encouraging DSA coach.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {"title": "Warm-Up", "message": "AI unavailable", "problems": []}
+
+
+COMPANY_FOCUS_PROMPT = """Generate company-specific interview preparation focus areas.
+Company: {company}. Student level: {experience_level}.
+Weak areas: {weak_areas}. Strong areas: {strong_areas}.
+
+Return JSON:
+{{
+    "company": "{company}",
+    "interview_format": "description of this company's interview process",
+    "top_patterns": ["pattern1", "pattern2", "pattern3"],
+    "focus_areas": [
+        {{
+            "area": "topic name",
+            "importance": "high|medium|low",
+            "why": "why this company asks about this",
+            "practice_problems": ["Two Sum", "LRU Cache"],
+            "tips": ["specific tip for this company"]
+        }}
+    ],
+    "company_specific_tips": ["tip1", "tip2"],
+    "common_questions": ["question1", "question2"],
+    "day_before_plan": "what to do the day before your interview"
+}}"""
+
+
+async def generate_company_focus(company, experience_level, weak_areas, strong_areas):
+    prompt = COMPANY_FOCUS_PROMPT.format(
+        company=company,
+        experience_level=experience_level,
+        weak_areas=weak_areas,
+        strong_areas=strong_areas,
+    )
+    try:
+        result = await _call_llm("You are a FAANG interview expert.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {"company": company, "focus_areas": [], "company_specific_tips": ["AI unavailable"]}
+
+
+# ═══════════════════════════════════════
+# PROBLEM SIMILARITY AGENT
+# ═══════════════════════════════════════
+
+PATTERN_EVOLUTION_PROMPT = """Explain how the problem "{problem_title}" fits into a pattern evolution chain.
+Patterns: {patterns}. Difficulty: {difficulty}.
+
+Show how simpler problems lead to this one, and what harder variants exist.
+
+Return JSON:
+{{
+    "problem_title": "{problem_title}",
+    "pattern_chain": [
+        {{
+            "level": "beginner",
+            "problem": "Two Sum",
+            "leetcode_number": 1,
+            "connection": "Introduces hash map lookup pattern"
+        }},
+        {{
+            "level": "intermediate",
+            "problem": "3Sum",
+            "leetcode_number": 15,
+            "connection": "Extends to multiple elements using two pointers + hash"
+        }}
+    ],
+    "key_evolution_insight": "how the pattern grows in complexity",
+    "what_changes_at_each_level": "what makes each step harder",
+    "mastery_path": "recommended order to build understanding"
+}}"""
+
+
+async def generate_pattern_evolution(problem_title, problem_patterns, difficulty):
+    prompt = PATTERN_EVOLUTION_PROMPT.format(
+        problem_title=problem_title,
+        patterns=problem_patterns,
+        difficulty=difficulty,
+    )
+    try:
+        result = await _call_llm("You are a DSA curriculum designer.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "problem_title": problem_title,
+            "pattern_chain": [],
+            "key_evolution_insight": "AI unavailable",
+        }
+
+
+# ═══════════════════════════════════════
+# BEHAVIORAL INTERVIEW AGENTS
+# ═══════════════════════════════════════
+
+BEHAVIORAL_QUESTIONS_PROMPT = """Generate behavioral interview questions.
+Company: {company}. Role: {role}. Student level: {experience_level}.
+Company framework: {framework}
+Experience summary: {experience_summary}
+
+Generate {num_questions} questions targeting different competencies.
+
+Return JSON:
+{{
+    "company": "{company}",
+    "questions": [
+        {{
+            "question": "Tell me about a time when...",
+            "competency": "leadership",
+            "principle": "specific company principle if applicable",
+            "what_they_look_for": "what the interviewer wants to hear",
+            "sample_structure": "brief STAR structure hint",
+            "difficulty": "easy|medium|hard",
+            "follow_ups": ["follow-up question 1"]
+        }}
+    ],
+    "general_tips": ["tip1", "tip2"]
+}}"""
+
+
+async def generate_behavioral_questions(company, role, framework, num_questions,
+                                         experience_summary, experience_level):
+    prompt = BEHAVIORAL_QUESTIONS_PROMPT.format(
+        company=company or "generic tech",
+        role=role,
+        experience_level=experience_level,
+        framework=json.dumps(framework) if framework else "general behavioral",
+        experience_summary=experience_summary or "not provided",
+        num_questions=num_questions,
+    )
+    try:
+        result = await _call_llm("You are a behavioral interview expert.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {"company": company, "questions": [], "general_tips": ["AI unavailable"]}
+
+
+REVIEW_BEHAVIORAL_PROMPT = """Review this behavioral interview answer using the STAR method.
+
+Question: {question}
+Answer: {answer}
+Company: {company}
+Principle being evaluated: {principle}
+
+Score and provide detailed feedback.
+
+Return JSON:
+{{
+    "overall_score": 7,
+    "star_breakdown": {{
+        "situation": {{"present": true, "score": 8, "feedback": "Clear context"}},
+        "task": {{"present": true, "score": 7, "feedback": "Could be more specific"}},
+        "action": {{"present": true, "score": 6, "feedback": "Good but mention YOUR specific actions"}},
+        "result": {{"present": false, "score": 3, "feedback": "Missing quantifiable results"}}
+    }},
+    "strengths": ["specific and honest"],
+    "improvements": ["add metrics", "emphasize personal contribution"],
+    "improved_version": "Here's how you could restructure: ...",
+    "principle_alignment": "How well this aligns with the target principle"
+}}"""
+
+
+async def review_behavioral_answer(question, answer, company=None, principle=None):
+    prompt = REVIEW_BEHAVIORAL_PROMPT.format(
+        question=question,
+        answer=answer,
+        company=company or "generic tech",
+        principle=principle or "general competency",
+    )
+    try:
+        result = await _call_llm("You are a behavioral interview coach.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "overall_score": 5,
+            "star_breakdown": {},
+            "strengths": [],
+            "improvements": ["AI review unavailable"],
+            "improved_version": "",
+        }
+
+
+STAR_COACHING_PROMPT = """Transform this raw experience into polished STAR responses.
+
+Raw experience: {experience}
+Target question type: {target_question_type}
+
+Generate multiple STAR-formatted answers from this one experience, each targeting a different behavioral question.
+
+Return JSON:
+{{
+    "original_experience": "summary of the raw experience",
+    "star_responses": [
+        {{
+            "target_question": "Tell me about a time you showed leadership",
+            "question_type": "leadership",
+            "situation": "concise situation setup",
+            "task": "your specific responsibility",
+            "action": "3-4 specific actions you took (use I, not we)",
+            "result": "quantifiable outcome",
+            "full_response": "the complete polished answer",
+            "time_to_deliver": "2-3 minutes"
+        }}
+    ],
+    "coaching_tips": ["tip1", "tip2"],
+    "versatility_note": "how this one experience can answer multiple question types"
+}}"""
+
+
+async def generate_star_coaching(experience, target_question_type=None):
+    prompt = STAR_COACHING_PROMPT.format(
+        experience=experience,
+        target_question_type=target_question_type or "general (generate multiple types)",
+    )
+    try:
+        result = await _call_llm("You are a career coaching expert.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "original_experience": experience[:200],
+            "star_responses": [],
+            "coaching_tips": ["AI coaching unavailable"],
+        }
+
+
+# ═══════════════════════════════════════
+# ELI5 + SOCRATIC TEACHING AGENTS
+# ═══════════════════════════════════════
+
+ELI5_PROMPT = """Explain "{topic}" {subtopic_text} like I'm 5 years old.
+
+Rules:
+- ZERO technical jargon. Use everyday words only.
+- Use a fun analogy from real life (toys, food, playground, etc.)
+- Build understanding step by step
+- Include a simple "try it yourself" activity
+- Keep it genuinely simple but accurate
+{context_text}
+
+Return JSON:
+{{
+    "title": "fun title like 'Sorting is like organizing your toy box!'",
+    "analogy": "the main real-world analogy",
+    "explanation": "the full ELI5 explanation in markdown (at least 500 words)",
+    "key_takeaway": "one sentence a 5-year-old would remember",
+    "try_it_yourself": "a simple hands-on activity to understand the concept",
+    "visual_description": "describe a simple picture/diagram that would help",
+    "now_the_grown_up_version": "2-3 sentence bridge to the actual CS concept",
+    "fun_fact": "a fun/surprising fact related to this topic"
+}}"""
+
+
+async def teach_eli5(topic, subtopic=None, context=None):
+    subtopic_text = f"(specifically: {subtopic})" if subtopic else ""
+    context_text = f"The student already knows: {context}" if context else ""
+    prompt = ELI5_PROMPT.format(
+        topic=topic,
+        subtopic_text=subtopic_text,
+        context_text=context_text,
+    )
+    try:
+        result = await _call_llm("You are the world's best teacher for young children.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "title": f"Understanding {topic}",
+            "analogy": "AI unavailable",
+            "explanation": f"Let's learn about {topic}! AI explanation unavailable right now.",
+            "key_takeaway": f"{topic} is an important concept in computer science.",
+        }
+
+
+SOCRATIC_PROMPT = """You are a Socratic teacher for DSA. NEVER give direct answers.
+Only ask guiding questions that lead the student to discover the answer themselves.
+
+Topic: {topic}
+Student's current understanding: {current_understanding}
+
+Previous conversation:
+{previous_text}
+
+Ask the NEXT guiding question. Build on their previous answers.
+If they're wrong, ask a question that reveals the flaw in their thinking.
+If they're right, go deeper.
+
+Return JSON:
+{{
+    "question": "your guiding question",
+    "why_this_question": "what you hope the student will discover",
+    "if_they_say_yes": "follow-up if they answer correctly",
+    "if_they_struggle": "a simpler sub-question to help",
+    "concept_being_explored": "the underlying concept",
+    "progress_assessment": "how close they are to full understanding (0-100)",
+    "encouragement": "brief encouraging note"
+}}"""
+
+
+async def teach_socratic(topic, current_understanding=None, previous_answers=None):
+    prev_text = ""
+    if previous_answers:
+        prev_text = "\n".join(
+            f"Q: {qa.get('question', '')}\nA: {qa.get('answer', '')}"
+            for qa in previous_answers
+        )
+
+    prompt = SOCRATIC_PROMPT.format(
+        topic=topic,
+        current_understanding=current_understanding or "not assessed yet",
+        previous_text=prev_text or "This is the first question.",
+    )
+    try:
+        result = await _call_llm("You are Socrates teaching computer science.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "question": f"What do you think {topic} means? Can you think of a real-world example?",
+            "why_this_question": "Starting with intuition",
+            "concept_being_explored": topic,
+            "progress_assessment": 0,
+            "encouragement": "Great start! Let's explore together.",
+        }
+
+
+# ═══════════════════════════════════════
+# PROBLEM SIMILARITY HELPER (for find_similar_problems import)
+# ═══════════════════════════════════════
+
+async def find_similar_problems(problem_title, patterns, difficulty):
+    """AI-powered similar problem finder (used as fallback when DB matching insufficient)."""
+    prompt = f"""Find 5 LeetCode problems similar to "{problem_title}" which uses patterns: {patterns} at {difficulty} difficulty.
+
+Return JSON:
+{{
+    "similar": [
+        {{"title": "Problem Name", "leetcode_number": 1, "patterns": ["pattern"], "difficulty": "medium", "why_similar": "explanation"}}
+    ]
+}}"""
+    try:
+        result = await _call_llm("You are a LeetCode expert.", prompt, json_mode=True)
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {"similar": []}
+
+
+# ═══════════════════════════════════════
+# TRENDING TECH TOPICS
+# ═══════════════════════════════════════
+
+import httpx
+
+async def _fetch_hackernews_top(limit=30):
+    """Fetch top Hacker News story titles."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get("https://hacker-news.firebaseio.com/v0/topstories.json")
+            ids = resp.json()[:limit]
+            stories = []
+            for sid in ids[:limit]:
+                r = await client.get(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json")
+                item = r.json()
+                if item and item.get("title"):
+                    stories.append({"title": item["title"], "url": item.get("url", ""), "score": item.get("score", 0)})
+            return stories
+    except Exception:
+        return []
+
+
+async def _fetch_devto_trending(limit=15):
+    """Fetch trending dev.to articles."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get("https://dev.to/api/articles", params={"per_page": limit, "top": 7})
+            articles = resp.json()
+            return [{"title": a["title"], "url": a["url"], "tags": a.get("tag_list", []), "reactions": a.get("positive_reactions_count", 0)} for a in articles]
+    except Exception:
+        return []
+
+
+async def fetch_trending_topics(category="all"):
+    """Fetch trending topics from the web and filter for interview relevance."""
+    hn_stories, devto_articles = await asyncio.gather(
+        _fetch_hackernews_top(30),
+        _fetch_devto_trending(15),
+    )
+
+    hn_text = "\n".join(f"- {s['title']} (score: {s['score']})" for s in hn_stories) or "No HN stories fetched."
+    devto_text = "\n".join(f"- {a['title']} (tags: {', '.join(a.get('tags', []))})" for a in devto_articles) or "No dev.to articles fetched."
+
+    cat_filter = ""
+    if category != "all":
+        cat_filter = f"\nFocus specifically on: {category}"
+
+    prompt = f"""Here are today's trending stories from Hacker News and dev.to:
+
+**Hacker News Top Stories:**
+{hn_text}
+
+**Dev.to Trending Articles:**
+{devto_text}
+
+From these, select 6-10 topics that are MOST relevant for software engineering interviews and career growth. Focus on:{cat_filter}
+- AI/ML innovations, frameworks, and tools
+- System design trends (databases, infra, distributed systems)
+- Programming languages and frameworks trending right now
+- Software architecture patterns
+- DevOps, cloud, and platform engineering
+- Algorithms and data structures in industry context
+- Security trends
+
+For each topic, provide a concise but rich explanation that would help someone prepare for interviews.
+
+Return JSON:
+{{
+    "topics": [
+        {{
+            "title": "short catchy title",
+            "category": "AI/ML" | "System Design" | "Languages & Frameworks" | "DevOps & Cloud" | "Architecture" | "Security" | "Algorithms",
+            "why_trending": "1-2 sentence on why this is trending right now",
+            "interview_relevance": "why an interviewer might ask about this",
+            "key_concepts": ["concept1", "concept2", "concept3"],
+            "deep_dive": "3-5 paragraph detailed explanation covering what it is, how it works, trade-offs, and real-world applications. Include technical depth suitable for a senior engineer interview.",
+            "interview_questions": [
+                "sample interview question 1",
+                "sample interview question 2"
+            ],
+            "resources": ["suggested search term or topic to study further"],
+            "source": "HN" | "dev.to" | "both"
+        }}
+    ],
+    "last_updated": "today's context",
+    "summary": "one-liner about today's tech landscape"
+}}"""
+
+    try:
+        result = await _call_llm(
+            "You are a senior tech interviewer and industry analyst who tracks the latest technology trends. "
+            "Your job is to curate trending topics and explain them in depth for interview preparation.",
+            prompt,
+            json_mode=True,
+        )
+        data = _repair_and_parse_json(result)
+        data["_sources"] = {
+            "hackernews": [{"title": s["title"], "url": s.get("url", "")} for s in hn_stories[:10]],
+            "devto": [{"title": a["title"], "url": a.get("url", "")} for a in devto_articles[:10]],
+        }
+        return data
+    except Exception:
+        return {
+            "topics": [],
+            "summary": "Could not fetch trending topics. Check your LLM configuration.",
+            "_sources": {"hackernews": [{"title": s["title"], "url": s.get("url", "")} for s in hn_stories[:10]], "devto": [{"title": a["title"], "url": a.get("url", "")} for a in devto_articles[:10]]},
+        }
+
+
+async def deep_dive_topic(topic_title, topic_context=""):
+    """Generate an in-depth interview-ready explanation of a specific trending topic."""
+    prompt = f"""Create a comprehensive, interview-ready deep dive on this trending tech topic:
+
+**Topic:** {topic_title}
+**Context:** {topic_context}
+
+Cover:
+1. What it is and why it matters RIGHT NOW
+2. Technical architecture / how it works under the hood
+3. Trade-offs and comparisons with alternatives
+4. Real-world use cases at scale (FAANG-level examples)
+5. Common interview questions and strong answers
+6. Code snippets or pseudocode if applicable
+7. Related topics to study
+
+Return JSON:
+{{
+    "title": "{topic_title}",
+    "overview": "2-3 sentence TL;DR",
+    "sections": [
+        {{
+            "heading": "section title",
+            "content": "detailed markdown content with code blocks if relevant",
+            "key_points": ["point1", "point2"]
+        }}
+    ],
+    "interview_qa": [
+        {{
+            "question": "interview question",
+            "strong_answer": "detailed answer that would impress an interviewer",
+            "follow_up": "likely follow-up question"
+        }}
+    ],
+    "code_example": {{
+        "language": "python",
+        "code": "relevant code snippet",
+        "explanation": "what this code demonstrates"
+    }},
+    "related_topics": ["topic1", "topic2", "topic3"]
+}}"""
+
+    try:
+        result = await _call_llm(
+            "You are a principal engineer and tech interviewer at a FAANG company. "
+            "Explain cutting-edge topics with the depth expected in senior engineering interviews.",
+            prompt,
+            json_mode=True,
+        )
+        return _repair_and_parse_json(result)
+    except Exception:
+        return {
+            "title": topic_title,
+            "overview": "Deep dive unavailable. Check LLM configuration.",
+            "sections": [],
+            "interview_qa": [],
+            "related_topics": [],
+        }

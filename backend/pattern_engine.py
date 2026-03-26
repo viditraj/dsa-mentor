@@ -609,3 +609,7 @@ def match_patterns_to_problem(problem_title: str, problem_description: str = "")
 
     matches.sort(key=lambda x: x[1], reverse=True)
     return [{"key": k, "score": s, **PATTERNS[k]} for k, s in matches[:3]]
+
+
+# Alias so routes can import either name
+PATTERN_CATALOG = PATTERNS

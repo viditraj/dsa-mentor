@@ -13,6 +13,11 @@ import ReviewQueuePage from './pages/ReviewQueuePage'
 import FAANGPrepPage from './pages/FAANGPrepPage'
 import SystemDesignPage from './pages/SystemDesignPage'
 import AIConceptsPage from './pages/AIConceptsPage'
+import MockInterviewPage from './pages/MockInterviewPage'
+import WeaknessDrillPage from './pages/WeaknessDrillPage'
+import InterviewToolkitPage from './pages/InterviewToolkitPage'
+import BehavioralPrepPage from './pages/BehavioralPrepPage'
+import TrendingTopicsPage from './pages/TrendingTopicsPage'
 
 function App() {
   const [user, setUser] = useUser()
@@ -35,6 +40,11 @@ function App() {
         <Route path="/system-design" element={<SystemDesignPage userId={user.id} user={user} />} />
         <Route path="/ai-concepts" element={<AIConceptsPage userId={user.id} user={user} />} />
         <Route path="/chat" element={<ChatPage userId={user.id} />} />
+        <Route path="/mock-interview" element={<MockInterviewPage userId={user.id} user={user} />} />
+        <Route path="/weakness-drill" element={<WeaknessDrillPage userId={user.id} user={user} />} />
+        <Route path="/interview-toolkit" element={<InterviewToolkitPage userId={user.id} user={user} />} />
+        <Route path="/behavioral-prep" element={<BehavioralPrepPage userId={user.id} user={user} />} />
+        <Route path="/trending" element={<TrendingTopicsPage userId={user.id} user={user} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

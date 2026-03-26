@@ -238,3 +238,25 @@ class PatternMastery(Base):
     template_practiced = Column(Boolean, default=False)
 
     user = relationship("UserProfile", backref="pattern_mastery")
+
+
+class MockInterviewSession(Base):
+    """Tracks mock interview sessions."""
+    __tablename__ = "mock_interview_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
+    difficulty = Column(String(20), default="medium")
+    focus_area = Column(String(100), nullable=True)
+    company_style = Column(String(50), nullable=True)
+    duration_minutes = Column(Integer, default=45)
+    problem_title = Column(String(300), nullable=True)
+    problem_description = Column(Text, nullable=True)
+    conversation = Column(JSON, default=list)
+    status = Column(String(20), default="in_progress")  # in_progress, completed, abandoned
+    score = Column(Integer, nullable=True)
+    feedback = Column(JSON, nullable=True)
+    started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    ended_at = Column(DateTime, nullable=True)
+
+    user = relationship("UserProfile", backref="mock_interviews")

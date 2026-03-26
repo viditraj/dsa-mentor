@@ -221,3 +221,96 @@ export const getAIConcepts = (phase = null, tag = null) => {
 
 export const getAIConcept = (conceptId) =>
   request(`/ai-concepts/concept/${conceptId}`);
+
+// ── Code Execution ──
+export const executeCode = (data) =>
+  request('/code/execute', { method: 'POST', body: JSON.stringify(data) });
+
+export const runTestCases = (data) =>
+  request('/code/run-tests', { method: 'POST', body: JSON.stringify(data) });
+
+export const getSupportedLanguages = () => request('/code/languages');
+
+// ── Mock Interview ──
+export const startMockInterview = (data) =>
+  request('/mock-interview/start', { method: 'POST', body: JSON.stringify(data) });
+
+export const sendInterviewMessage = (data) =>
+  request('/mock-interview/respond', { method: 'POST', body: JSON.stringify(data) });
+
+export const endMockInterview = (sessionId) =>
+  request(`/mock-interview/${sessionId}/end`, { method: 'POST' });
+
+export const getInterviewHistory = (userId, limit = 10) =>
+  request(`/mock-interview/${userId}/history?limit=${limit}`);
+
+// ── Weakness Drill ──
+export const analyzeWeaknesses = (userId) =>
+  request(`/weakness-drill/${userId}/analyze`);
+
+export const generateWeaknessDrill = (data) =>
+  request('/weakness-drill/generate', { method: 'POST', body: JSON.stringify(data) });
+
+// ── Complexity Analyzer ──
+export const analyzeComplexity = (data) =>
+  request('/complexity/analyze', { method: 'POST', body: JSON.stringify(data) });
+
+// ── Interview Toolkit ──
+export const getPatternQuiz = (userId, numQuestions = 10) =>
+  request(`/interview-toolkit/${userId}/quiz?num_questions=${numQuestions}`);
+
+export const scoreQuiz = (userId, answers) =>
+  request(`/interview-toolkit/${userId}/quiz/score`, { method: 'POST', body: JSON.stringify({ answers }) });
+
+export const getCheatSheet = (userId, focus = null) => {
+  const params = focus ? `?focus=${encodeURIComponent(focus)}` : '';
+  return request(`/interview-toolkit/${userId}/cheat-sheet${params}`);
+};
+
+export const getWarmup = (userId) =>
+  request(`/interview-toolkit/${userId}/warmup`);
+
+export const getCompanyFocus = (userId, company = 'google') =>
+  request(`/interview-toolkit/${userId}/company-focus?company=${encodeURIComponent(company)}`);
+
+// ── Problem Similarity ──
+export const getSimilarProblems = (problemId, limit = 5) =>
+  request(`/similarity/similar/${problemId}?limit=${limit}`);
+
+export const getPatternFamily = (patternKey) =>
+  request(`/similarity/pattern-family/${patternKey}`);
+
+export const getPatternEvolution = (problemId) =>
+  request(`/similarity/evolution/${problemId}`);
+
+export const getProblemRecommendations = (userId, limit = 5) =>
+  request(`/similarity/${userId}/recommendations?limit=${limit}`);
+
+// ── Behavioral Prep ──
+export const getBehavioralFrameworks = () => request('/behavioral/frameworks');
+
+export const getCompanyFramework = (company) =>
+  request(`/behavioral/frameworks/${company}`);
+
+export const generateBehavioralQuestions = (data) =>
+  request('/behavioral/questions', { method: 'POST', body: JSON.stringify(data) });
+
+export const reviewBehavioralAnswer = (data) =>
+  request('/behavioral/review-answer', { method: 'POST', body: JSON.stringify(data) });
+
+export const getStarCoaching = (data) =>
+  request('/behavioral/star-coaching', { method: 'POST', body: JSON.stringify(data) });
+
+// ── Teaching Modes ──
+export const teachELI5 = (data) =>
+  request('/teaching/eli5', { method: 'POST', body: JSON.stringify(data) });
+
+export const teachSocratic = (data) =>
+  request('/teaching/socratic', { method: 'POST', body: JSON.stringify(data) });
+
+// ── Trending Topics ──
+export const getTrendingTopics = (category = 'all') =>
+  request(`/trending/?category=${encodeURIComponent(category)}`);
+
+export const getTopicDeepDive = (data) =>
+  request('/trending/deep-dive', { method: 'POST', body: JSON.stringify(data) });

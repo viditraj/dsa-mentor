@@ -11,6 +11,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import AlgorithmVisualizer from '../visualizations/AlgorithmVisualizer'
+import TeachingModeWidget from '../components/TeachingModeWidget'
 
 /** Strip markdown code fences (```python ... ```) that LLM may wrap around code */
 function stripCodeFences(code) {
@@ -85,6 +86,7 @@ export default function LearnPage({ userId, user }) {
 
   const tabs = [
     { id: 'explanation', label: 'Explanation', icon: BookOpen },
+    { id: 'eli5', label: 'ELI5 / Socratic', icon: Lightbulb },
     { id: 'videos', label: 'Videos', icon: Youtube },
     { id: 'visualization', label: 'Visualization', icon: Eye },
     { id: 'code', label: 'Code', icon: Code2 },
@@ -240,6 +242,10 @@ export default function LearnPage({ userId, user }) {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'eli5' && (
+          <TeachingModeWidget topic={topicName} />
         )}
 
         {activeTab === 'videos' && (

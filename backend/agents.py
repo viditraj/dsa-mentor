@@ -149,10 +149,9 @@ def _repair_and_parse_json(raw: str) -> dict:
 
 
 async def _call_llm(system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
-    """Call the Dell LLM (gpt-oss-120b) with given prompts.
+    """Call the LLM with given prompts.
     
-    On first call, this triggers Dell SSO authentication.
-    Runs the synchronous Dell LLM client in a thread pool for async compat.
+    Runs the synchronous LLM client in a thread pool for async compat.
     """
     try:
         client = get_llm_client()
@@ -166,7 +165,7 @@ async def _call_llm(system_prompt: str, user_prompt: str, json_mode: bool = Fals
     ]
 
     try:
-        # Run synchronous Dell LLM call in a thread pool to keep async
+        # Run synchronous LLM call in a thread pool to keep async
         loop = asyncio.get_event_loop()
         if json_mode:
             result = await loop.run_in_executor(None, client.chat_json, messages)
@@ -179,10 +178,10 @@ async def _call_llm(system_prompt: str, user_prompt: str, json_mode: bool = Fals
 
 
 def _fallback_response(prompt: str) -> str:
-    """Provide intelligent fallback when Dell LLM is unavailable."""
+    """Provide intelligent fallback when LLM is unavailable."""
     return json.dumps({
-        "response": "AI features require Dell SSO authentication. "
-                     "Please ensure USE_SSO=true is set and complete the Dell SSO login. "
+        "response": "AI features require an LLM provider to be configured. "
+                     "Please set LLM_PROVIDER to 'nvidia' or 'ollama' and provide the necessary API keys. "
                      "Meanwhile, the app works with the built-in DSA curriculum and visualizations!",
         "visualization": None,
         "code_example": None,
@@ -867,7 +866,7 @@ Return as JSON:
         return _repair_and_parse_json(result)
     except Exception:
         return {
-            "problem_understanding": f"**{problem_title}** is a {difficulty} level problem. Enable AI features (Dell SSO) for a comprehensive walkthrough.",
+            "problem_understanding": f"**{problem_title}** is a {difficulty} level problem. Enable AI features for a comprehensive walkthrough.",
             "thinking_process": "Start by understanding the input/output constraints, then identify which DSA pattern applies.",
             "approach": "Analyze the problem constraints to determine the optimal approach.",
             "walkthrough": "Enable AI for a detailed step-by-step walkthrough with examples.",

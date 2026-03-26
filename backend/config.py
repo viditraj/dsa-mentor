@@ -9,12 +9,8 @@ class Settings(BaseSettings):
     DAILY_PROBLEMS_COUNT: int = 3
     MAX_DAILY_CONCEPTS: int = 2
 
-    # LLM provider: "dell", "nvidia", or "ollama"
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "dell")
-
-    # Dell
-    DELL_LLM_MODEL: str = os.getenv("DELL_LLM_MODEL", "gpt-oss-120b")
-    DELL_LLM_BASE_URL: str = os.getenv("DELL_LLM_BASE_URL", "https://aia.gateway.dell.com/genai/dev/v1")
+    # LLM provider: "nvidia" or "ollama"
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "nvidia")
 
     # NVIDIA NIM
     NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
